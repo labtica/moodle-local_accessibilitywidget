@@ -16,7 +16,6 @@
 
 namespace local_accessibilitywidget\privacy;
 
-defined('MOODLE_INTERNAL') || die();
 
 /**
  * Privacy Subsystem implementation for local_accessibilitywidget.
@@ -36,4 +35,3 @@ class provider implements \core_privacy\local\metadata\null_provider {
         return 'privacy:metadata';
     }
 }
-

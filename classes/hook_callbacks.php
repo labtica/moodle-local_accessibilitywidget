@@ -53,14 +53,14 @@ class hook_callbacks {
             return;
         }
 
-        // Detectar si estamos en una página de edición compleja
+        // Detect if we are on a complex editing page.
         $scriptname = basename($_SERVER['SCRIPT_NAME'] ?? '', '.php');
-        $isEditingPage = in_array($scriptname, ['edit', 'editsection', 'course_edit', 'modedit', 'course']);
-        
+        $iseditingpage = in_array($scriptname, ['edit', 'editsection', 'course_edit', 'modedit', 'course']);
+
         $config = self::get_widget_config();
-        // Agregar flag de modo ligero para páginas complejas
-        $config['lightMode'] = $isEditingPage;
-        
+        // Add light mode flag for complex pages.
+        $config['lightMode'] = $iseditingpage;
+
         // Provide the runtime config to the vanilla JS widget.
         $js = 'window.a11yWidgetConfig = ' . json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ';';
         $hook->add_html(\html_writer::tag('script', $js, ['type' => 'text/javascript', 'data-accessibilitywidget' => 'config']));
@@ -131,4 +131,3 @@ class hook_callbacks {
         return 'es';
     }
 }
-

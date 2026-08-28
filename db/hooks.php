@@ -31,4 +31,3 @@ $callbacks = [
         'priority' => 0,
     ],
 ];
-
