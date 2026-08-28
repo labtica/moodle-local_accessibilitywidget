@@ -24,22 +24,16 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$string['pluginname'] = 'Widget de Accesibilidad';
-
+$string['defaultlang'] = 'Idioma del widget';
+$string['defaultlang_auto'] = 'Auto (desde Moodle)';
+$string['defaultlang_desc'] = 'Idioma usado por la interfaz del widget. "Auto" usa el idioma actual de Moodle (si no es inglés, cae a español).';
+$string['defaultlang_en'] = 'Inglés';
+$string['defaultlang_es'] = 'Español';
 $string['enabled'] = 'Habilitar widget';
 $string['enabled_desc'] = 'Si se desactiva, el widget de accesibilidad no se inyectará en ninguna página.';
-
-$string['defaultlang'] = 'Idioma del widget';
-$string['defaultlang_desc'] = 'Idioma usado por la interfaz del widget. "Auto" usa el idioma actual de Moodle (si no es inglés, cae a español).';
-$string['defaultlang_auto'] = 'Auto (desde Moodle)';
-$string['defaultlang_es'] = 'Español';
-$string['defaultlang_en'] = 'Inglés';
-
-$string['zindex'] = 'z-index';
-$string['zindex_desc'] = 'z-index CSS usado por el widget flotante. Auméntalo si queda detrás de otros elementos.';
-
+$string['pluginname'] = 'Widget de Accesibilidad';
+$string['privacy:metadata'] = 'Este plugin no almacena datos personales en Moodle. Solo guarda preferencias en el navegador del usuario (localStorage).';
 $string['storagekey'] = 'Clave de localStorage';
 $string['storagekey_desc'] = 'Clave del navegador usada para persistir las preferencias del usuario.';
-
-$string['privacy:metadata'] = 'Este plugin no almacena datos personales en Moodle. Solo guarda preferencias en el navegador del usuario (localStorage).';
-
+$string['zindex'] = 'z-index';
+$string['zindex_desc'] = 'z-index CSS usado por el widget flotante. Auméntalo si queda detrás de otros elementos.';
