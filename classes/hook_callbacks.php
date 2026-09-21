@@ -61,12 +61,9 @@ class hook_callbacks {
         // Add light mode flag for complex pages.
         $config['lightMode'] = $iseditingpage;
 
-        // Provide the runtime config to the vanilla JS widget.
-        $js = 'window.a11yWidgetConfig = ' . json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ';';
-        $hook->add_html(\html_writer::tag('script', $js, ['type' => 'text/javascript', 'data-accessibilitywidget' => 'config']));
-
-        // Enqueue the widget script (loaded in the footer by default).
-        $PAGE->requires->js('/local/accessibilitywidget/a11y-widget.js');
+        // Initialise the widget through its AMD module, passing the runtime
+        // configuration as the init() argument.
+        $PAGE->requires->js_call_amd('local_accessibilitywidget/a11y-widget', 'init', [$config]);
     }
 
     /**
