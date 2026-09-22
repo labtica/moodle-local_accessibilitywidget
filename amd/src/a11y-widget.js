@@ -87,6 +87,7 @@ var I18N = {
     backdrop: 'Cerrar',
     on: 'Sí',
     off: 'No',
+    lightModeHint: 'Panel simplificado para páginas de edición',
   },
   en: {
     title: 'Accessibility',
@@ -136,6 +137,7 @@ var I18N = {
     backdrop: 'Close',
     on: 'On',
     off: 'Off',
+    lightModeHint: 'Simplified panel for editing pages',
   },
 };
 
@@ -204,6 +206,11 @@ function getGlobalCss() {
 
 var GLOBAL_CSS =
   '' +
+  // Define the widget's accent custom properties at document scope. Both are referenced by
+  // page-level rules (read-on-click outline, reading-mask guide lines) and inherit into the
+  // widget's Shadow DOM. The Moodle theme never defines them, so without defaults they
+  // resolve to the empty string (transparent backgrounds, invisible outlines).
+  ':root{--highlight:#2a5eb8;--color-marca1:#2a5eb8;}' +
   'html[' +
   PREFIX +
   'font-scale="100"],html[' +
@@ -344,6 +351,8 @@ function getConfig(providedConfig) {
     zIndex: typeof c.zIndex === 'number' ? c.zIndex : 2147483000,
     assetBaseUrl: base,
     assetMode: assetMode,
+    // Editing pages get a reduced panel (no profiles, core options only).
+    lightMode: c.lightMode === true,
   };
 }
 
@@ -425,6 +434,29 @@ function defaultState() {
 }
 
 /**
+ * Remove previously captured base font sizes and the inline font-size overrides, so the
+ * next capture pass measures truly un-scaled values. Skips the widget host subtree.
+ *
+ * @param {Document} doc
+ */
+function resetCapturedFontSizes(doc) {
+  if (!doc || !doc.body) {
+    return;
+  }
+  var nodes = doc.body.querySelectorAll('*');
+  for (var i = 0; i < nodes.length; i += 1) {
+    var el = nodes[i];
+    if (el.closest('#a11y-widget-host')) {
+      continue;
+    }
+    if (el.hasAttribute('data-a11y-base-font-size')) {
+      el.style.removeProperty('font-size');
+      el.removeAttribute('data-a11y-base-font-size');
+    }
+  }
+}
+
+/**
  *
  * @param {String} scalePercent
  * @param {Document} optDoc
@@ -440,20 +472,11 @@ function applyFontScaleFallback(scalePercent, optDoc) {
   var i;
 
   if (scale === 1) {
-    for (i = 0; i < nodes.length; i += 1) {
-      var resetEl = nodes[i];
-      if (resetEl.closest('#a11y-widget-host')) {
-        continue;
-      }
-      if (resetEl.hasAttribute('data-a11y-base-font-size')) {
-        resetEl.style.removeProperty('font-size');
-        resetEl.removeAttribute('data-a11y-base-font-size');
-      }
-    }
+    resetCapturedFontSizes(doc);
     return;
   }
 
-  // Step 1: capture the base font size before applying changes, to avoid accumulation.
+  // Capture the base font size before applying changes, to avoid accumulation.
   for (i = 0; i < nodes.length; i += 1) {
     var captureEl = nodes[i];
     if (captureEl.closest('#a11y-widget-host')) {
@@ -496,6 +519,14 @@ function applyFontScaleFallback(scalePercent, optDoc) {
 function applyToDocument(htmlEl, state, optDoc) {
   var doc = optDoc || document;
   var fs = FONT_STEPS[state.fontStep] || FONT_STEPS[0];
+
+  // Remove the scale cascade FIRST, then clear captured bases and inline overrides, so the
+  // fresh capture below measures un-scaled (true base) font sizes. Capturing after the
+  // html[data-a11y-font-scale] cascade is applied caused compounding across reloads: an
+  // element inheriting from a scaled ancestor recorded a scaled base (e.g. 16.5 instead of
+  // 15), and cycling scaled it again on top.
+  htmlEl.removeAttribute(PREFIX + 'font-scale');
+  resetCapturedFontSizes(doc);
   htmlEl.setAttribute(PREFIX + 'font-scale', fs);
   applyFontScaleFallback(fs, doc);
 
@@ -546,6 +577,10 @@ function shadowCss(cfg) {
   return (
     ':host{all:initial;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}' +
     '*{box-sizing:border-box;}' +
+    // --highlight / --color-marca1 are re-declared here in case :host{all:initial} or a
+    // page-level stylesheet removes the document-scope defaults injected via GLOBAL_CSS.
+    // #2a5eb8 on white text yields 6.19:1 contrast (WCAG AA pass).
+    ':host{--highlight:#2a5eb8;--color-marca1:#2a5eb8;}' +
       '.w{--w-bg:#f6f7f9;--w-fg:#111;--w-bd:#c8ccd4;--w-accent:var(--color-marca1);--w-accent-soft:color-mix(in srgb, ' +
       'var(--color-marca1) 12%, transparent);--w-surface:#ffffff;--w-radius:12px;--w-shadow:0 8px 32px rgba(0,0,0,.18);' +
       'font-size:16px;line-height:1.4;color:var(--w-fg);}' +
@@ -614,6 +649,8 @@ function shadowCss(cfg) {
       'ease,color .16s ease;}' +
     '.reset:hover{border-color:var(--highlight);background:transparent;color:var(--highlight);}' +
     '.reset:focus-visible{outline:2px solid var(--w-accent);}' +
+    '.light-hint{margin:0 0 12px;padding:8px 10px;border:1px solid var(--w-bd);border-radius:8px;background:#fff;' +
+    'color:#444;font-size:.8rem;line-height:1.3;}' +
     '.toolbar-host{display:inline-flex;vertical-align:middle;}'
   );
 }
@@ -1302,6 +1339,50 @@ function buildPanelHTML(cfg, state) {
   for (var i = 0; i < ACCESSIBILITY_PROFILES.length; i += 1) {
     profileCards += profileCardHTML(cfg, state, ACCESSIBILITY_PROFILES[i]);
   }
+  // Light mode (editing pages): render a reduced panel. The FAB stays available, but the
+  // profiles grid is hidden and only the most useful options are shown, so the widget does
+  // not compete with the editing UI. Behavior is otherwise identical (same state, same
+  // persistence, same "Reset all").
+  var lightMode = cfg.lightMode === true;
+  var optionFields = lightMode
+    ? ['fontStep', 'theme', 'readingMask', 'cursorLarge']
+    : [
+        'theme',
+        'saturation',
+        'readingMask',
+        'autoCC',
+        'reduceMotion',
+        'cursorLarge',
+        'dyslexiaFriendly',
+        'readOnClick',
+        'fontStep',
+        'letterSpacing',
+        'textAlign',
+      ];
+  var optionCards = '';
+  for (var j = 0; j < optionFields.length; j += 1) {
+    optionCards += optionCardHTML(cfg, state, optionFields[j]);
+  }
+  var lightModeHintHTML = lightMode
+    ? '<p class="light-hint" role="note">' + esc(translate('lightModeHint')) + '</p>'
+    : '';
+  var profilesHTML = lightMode
+    ? ''
+    : '<div class="profiles-wrap" data-collapsed="' +
+      (state.profilesCollapsed ? '1' : '0') +
+      '">' +
+      '<button type="button" class="profiles-toggle" data-act="toggle-profiles" aria-expanded="' +
+      (state.profilesCollapsed ? 'false' : 'true') +
+      '">' +
+      '<span class="profiles-title">' +
+      esc(translate('profilesTitle')) +
+      '</span><span class="profiles-chevron" aria-hidden="true">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>' +
+      '</span></button>' +
+      '<div class="profiles-grid">' +
+      profileCards +
+      '</div>' +
+      '</div>';
   return (
     '<div class="w">' +
     '<button type="button" class="fab" data-act="toggle-panel" aria-expanded="false" aria-controls="a11y-w-panel" title="' +
@@ -1323,33 +1404,10 @@ function buildPanelHTML(cfg, state) {
     '</button>' +
     '</div>' +
     '<div class="body">' +
-    '<div class="profiles-wrap" data-collapsed="' +
-    (state.profilesCollapsed ? '1' : '0') +
-    '">' +
-    '<button type="button" class="profiles-toggle" data-act="toggle-profiles" aria-expanded="' +
-    (state.profilesCollapsed ? 'false' : 'true') +
-    '">' +
-    '<span class="profiles-title">' +
-    esc(translate('profilesTitle')) +
-    '</span><span class="profiles-chevron" aria-hidden="true">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>' +
-    '</span></button>' +
-    '<div class="profiles-grid">' +
-    profileCards +
-    '</div>' +
-    '</div>' +
+    lightModeHintHTML +
+    profilesHTML +
     '<div class="grid">' +
-    optionCardHTML(cfg, state, 'theme') +
-    optionCardHTML(cfg, state, 'saturation') +
-    optionCardHTML(cfg, state, 'readingMask') +
-    optionCardHTML(cfg, state, 'autoCC') +
-    optionCardHTML(cfg, state, 'reduceMotion') +
-    optionCardHTML(cfg, state, 'cursorLarge') +
-    optionCardHTML(cfg, state, 'dyslexiaFriendly') +
-    optionCardHTML(cfg, state, 'readOnClick') +
-    optionCardHTML(cfg, state, 'fontStep') +
-    optionCardHTML(cfg, state, 'letterSpacing') +
-    optionCardHTML(cfg, state, 'textAlign') +
+    optionCards +
     '</div>' +
     '<button type="button" class="reset" data-act="reset">' +
     esc(translate('reset')) +
